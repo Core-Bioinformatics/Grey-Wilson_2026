@@ -1,4 +1,4 @@
-# Grey-Wilson_2024
+# Grey-Wilson et al 2026
 
 ## Cellular heterogeneity allows self-organogenesis of human liver bud in vitro
 C. Grey-Wilson, M. Larraz, C. Morell, Á. Blanes-Rodríguez, J. Martínez-García, I. Talon, S. Ghimire, A. Osnato, A. Munteanu, A. Shahsavari, M. Vila Gonzalez, C. Gribben, F. Roos, P. Baptista, I.
