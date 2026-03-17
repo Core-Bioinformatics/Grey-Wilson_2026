@@ -19,9 +19,8 @@ Uncovering the mechanisms directing the first step of organ formation is essenti
   * 1_MakeDatasets.R
   * 2_MakeApps.R
 
-- `inVivoComparisons` - Run comparison against in vivo datasets. Expected run order is:
+- `inVivoComparisons` - Run comparison against in vivo datasets.
   * CompareToInVivo.R
-  * MultiOmicsIntegration-FinalMethod.R
 
 - `GO` - Find and plot GO terms:
   * GO_terms.R
