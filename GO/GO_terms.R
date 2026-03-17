@@ -1,257 +1,188 @@
+library(reshape2)
+library(viridis)
 library(Seurat)
 library(gprofiler2)
 library(ggplot2)
 library(reshape2)
 library(viridis)
-so <- readRDS('2D-Timecourse.rds')
+library(RColorBrewer)
+so <- readRDS('object.rds')
+head(so@meta.data)
+Idents(so) <- so@meta.data$Annotation_Revisions
+table(so@meta.data$Annotation_Revisions)
+Idents(so) <- so@meta.data$Annotation_Revisions
+lfc <- 2.5
 
-Idents(so) <- so@meta.data$Annotations
-CMMarkers <- FindMarkers(so,ident.1 = 'Cardiomyocytes', logfc.threshold=0.5)
+so <- PrepSCTFindMarkers(so)
+CMMarkers <- FindMarkers(so,ident.1 = 'Cardiomyocytes', logfc.threshold=lfc)
 sigCM <- rownames(CMMarkers)[CMMarkers$p_val_adj<0.05]
-EndMarkers <- FindMarkers(so,ident.1 = 'Endothelial', logfc.threshold=0.5)
+EndMarkers <- FindMarkers(so,ident.1 = 'Endothelial', logfc.threshold=lfc)
 sigEnd <- rownames(EndMarkers)[EndMarkers$p_val_adj<0.05]
-
 allGenes <- rownames(so)
-
-
-resultsCM <- gost(query = sigCM, 
-                organism = "hsapiens", 
-                significant = TRUE, 
-                user_threshold = 0.05, 
-                correction_method = "fdr",
-                custom_bg = allGenes)$result
-
+resultsCM <- gost(query = sigCM,
+                  organism = "hsapiens",
+                  significant = TRUE,
+                  user_threshold = 0.05,
+                  correction_method = "fdr",
+                  custom_bg = allGenes)$result
 resultsCM <- apply(resultsCM,2,as.character)
-write.table(resultsCM, file = '2D-CM_GO.tsv', quote = FALSE, row.names = FALSE, sep = '\t')
-
-resultsEnd <- gost(query = sigEnd, 
-                   organism = "hsapiens", 
-                   significant = TRUE, 
-                   user_threshold = 0.05, 
+write.table(resultsCM, file = '2D-CM_GEO.tsv', quote = FALSE, row.names = FALSE, sep = '\t')
+resultsEnd <- gost(query = sigEnd,
+                   organism = "hsapiens",
+                   significant = TRUE,
+                   user_threshold = 0.05,
                    correction_method = "fdr",
                    custom_bg = allGenes)$result
-
 resultsEnd <- apply(resultsEnd,2,as.character)
-write.table(resultsEnd, file = '2D-End_GO.tsv', quote = FALSE, row.names = FALSE, sep = '\t')
+write.table(resultsEnd, file = '2D-End_GEO.tsv', quote = FALSE, row.names = FALSE, sep = '\t')
 
-comp <- 'Cardiomyocytes'
-Idents(so) <- so@meta.data$Annotations
-rest <- unique(so@meta.data$Annotations)
-rest <-  rest[rest != comp]
-CMterms <- c('GO:0009653','GO:0048731','GO:0035295','GO:0072359','GO:0001944','GO:0001568','GO:0001525','GO:0030154','GO:0007507','GO:0003013')
-CMterms_names <- c('Anatomical structure morphogenesis (GO:0009653)',
-                   'System development (GO:0048731)',
-                   'Tube development (GO:0035295)',
-                   'Circulatory system development (GO:0072359)',
-                   'Vasculature development (GO:0001944)',
-                   'Blood vessel development (GO:0001568)',
-                   'Angiogenesis (GO:0001525)',
-                   'Cell differentiation (GO:0030154)',
-                   'Heart development (GO:0007507)',
-                   'Circulatory system process (GO:0003013)')
+lsMarkers <- FindMarkers(so,ident.1 = 'LPM/SHF', logfc.threshold=lfc)
+sigLS <- rownames(lsMarkers)[lsMarkers$p_val_adj<0.05]
+resultsLS <- gost(query = sigLS,
+                   organism = "hsapiens",
+                   significant = TRUE,
+                   user_threshold = 0.05,
+                   correction_method = "fdr",
+                   custom_bg = allGenes)$result
+resultsLS <- apply(resultsLS,2,as.character)
 
-CMterms <- c('GO:0072359','GO:0030016','GO:0043292','GO:0030017','GO:0007507','GO:0061061','GO:0003205','GO:0014706','GO:0006936','GO:0031674','GO:0030018','GO:0042692')
-CMterms_names <- c('Circulatory system development (GO:0072359)',
-                   'Myofibril (GO:0030016)',
-                   'Contractile fiber (GO:0043292)',
-                   'Sarcomere (GO:0030017)',
-                   'Heart development (GO:0007507)',
-                   'Muscle structure development (GO:0061061)',
-                   'Cardiac chamber development (GO:0003205)',
-                   'Striated muscle tissue development (GO:0014706)',
-                   'Muscle contraction (GO:0006936)',
-                   'I band (GO:0031674)',
-                   'Z disc (GO:0030018)',
-                   'Muscle cell differentiation (GO:0042692)')
+eHPBMarkers <- FindMarkers(so,ident.1 = 'Early HPB', logfc.threshold=lfc)
+sig_eHPB <- rownames(eHPBMarkers)[eHPBMarkers$p_val_adj<0.05]
+resultseHPB <- gost(query = sig_eHPB,
+                  organism = "hsapiens",
+                  significant = TRUE,
+                  user_threshold = 0.05,
+                  correction_method = "fdr",
+                  custom_bg = allGenes)$result
+resultseHPB <- apply(resultseHPB,2,as.character)
 
+
+HEMarkers <- FindMarkers(so,ident.1 = 'Hepatic Endoderm', logfc.threshold=lfc)
+sigHE <- rownames(HEMarkers)[HEMarkers$p_val_adj<0.05]
+resultsHE <- gost(query = sigHE,
+                  organism = "hsapiens",
+                  significant = TRUE,
+                  user_threshold = 0.05,
+                  correction_method = "fdr",
+                  custom_bg = allGenes)$result
+resultsHE <- apply(resultsHE,2,as.character)
+
+resultsLS <- as.data.frame(resultsLS)
+resultsCM <- as.data.frame(resultsCM)
+resultsEnd <- as.data.frame(resultsEnd)
+resultseHPB <- as.data.frame(resultseHPB)
+resultsHE <- as.data.frame(resultsHE)
+
+terms <- c('GO:0072359','GO:0001944','GO:0035295','GO:0001568','GO:0001525','GO:0043542','GO:0002040','GO:0045446',
+           'GO:0007507','GO:0060047','GO:0048738','GO:0014706','GO:0045214','GO:0030016','GO:0030017','GO:0043292','GO:0016459','WP:WP383')
+resultsCMfilter <- resultsCM[resultsCM$term_id %in% terms,]
+resultsEndfilter <- resultsEnd[resultsEnd$term_id %in% terms,]
+resultsLSfilter <- resultsLS[resultsLS$term_id %in% terms,]
+resultseHPBfilter <- resultseHPB[resultseHPB$term_id %in% terms,]
+resultsHEfilter <- resultsHE[resultsHE$term_id %in% terms,]
+
+resultsCMfilter$CellType <- 'Cardiomyocyte'
+resultsEndfilter$CellType <- 'Endothelial'
+resultsLSfilter$CellType <- 'LPM/SHF'
+resultseHPBfilter$CellType <- 'Early HPB'
+resultsHEfilter$CellType <- 'Hepatic Endoderm'
+
+enrichment_all <- rbind(resultsCMfilter, resultsEndfilter,resultsLSfilter,resultseHPBfilter,resultsHEfilter)
+enrichment_all$term_name <- factor(enrichment_all$term_name, levels = unique(enrichment_all$term_name))
+enrichment_all$enrichment_ratio <- as.numeric(enrichment_all$intersection_size) / as.numeric(enrichment_all$term_size)
+enrichment_all$log_pval <- -log10(as.numeric(enrichment_all$p_value))
+enrichment_all$CellType <- factor(enrichment_all$CellType,
+                                  levels = c("Endothelial", "Cardiomyocyte",'LPM/SHF','Early HPB','Hepatic Endoderm'))
+enrichment_all$term_name <- factor(enrichment_all$term_name,
+                                   levels = unique(enrichment_all$term_name))
+
+enrichment_all <- enrichment_all[enrichment_all$enrichment_ratio>0.1,]
+
+ggplot(enrichment_all, aes(x = CellType,
+                           y = term_name,
+                           size = enrichment_ratio,
+                           color = log_pval)) +
+  geom_point(alpha = 0.8) +
+  scale_color_distiller(palette = "YlGnBu", direction = 1, name = "-log10(p-value)") +
+  scale_size(range = c(3, 10), name = "Enrichment ratio") +
+  labs(
+    x = "Cell Type",
+    y = "GO Term",
+    title = "GO Enrichment Comparison: Endothelial vs Cardiomyocytes"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    axis.text.y = element_text(size = 10),
+    axis.text.x = element_text(angle = 0, hjust = 0.5),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+
+library(reshape2)
+library(viridis)
+library(Seurat)
+library(gprofiler2)
+library(ggplot2)
+library(RColorBrewer)
+
+so <- readRDS('object.rds')
+Idents(so) <- so@meta.data$Annotation_Revisions
+lfc <- 2.5
+
+so <- PrepSCTFindMarkers(so)
 allGenes <- rownames(so)
 
-mat_p <- matrix(nrow = length(rest), ncol = length(CMterms))
-colnames(mat_p) <- CMterms
-rownames(mat_p) <- rest
-mat_ratio <- mat_p
+cell_types <- unique(so@meta.data$Annotation_Revisions)
+terms <- c('GO:0072359','GO:0001944','GO:0035295','GO:0001568','GO:0001525','GO:0043542',
+           'GO:0002040','GO:0045446','GO:0007507','GO:0060047','GO:0048738','GO:0014706',
+           'GO:0045214','GO:0030016','GO:0030017','GO:0043292','GO:0016459','WP:WP383')
 
-for (cellType in rest){
-  print(cellType)
-  CMMarkers <- FindMarkers(so,ident.1 = comp,ident.2 = cellType, logfc.threshold=0.5)
-  sigCM <- rownames(CMMarkers)[CMMarkers$p_val_adj<0.05]
-  resultsCM <- gost(query = sigCM, 
-                    organism = "hsapiens", 
-                    significant = TRUE, 
-                    user_threshold = 0.05, 
-                    correction_method = "fdr",
-                    custom_bg = allGenes)$result
+enrichment_list <- list()
+for(ct in cell_types) {
+  markers <- FindMarkers(so, ident.1 = ct, logfc.threshold = lfc)
+  sig_genes <- rownames(markers)[markers$p_val_adj < 0.05]
   
-  resultsCMfilter <- resultsCM[resultsCM$term_id %in% CMterms,]
+  results <- gost(query = sig_genes, organism = "hsapiens", significant = TRUE,
+                  user_threshold = 0.05, correction_method = "fdr", custom_bg = allGenes)$result
   
-  missing_terms <- setdiff(CMterms, resultsCM$term_id)
-  missing_df <- data.frame(term_id = missing_terms)
-  
-  if (length(missing_terms) > 0){
-    for(col in colnames(resultsCM)[-1]) {
-      missing_df[[col]] <- 0
+  if(!is.null(results)) {
+    results <- as.data.frame(apply(results, 2, as.character))
+    results_filter <- results[results$term_id %in% terms, ]
+    if(nrow(results_filter) > 0) {
+      results_filter$CellType <- ct
+      enrichment_list[[ct]] <- results_filter
     }
-    missing_df$term_id <- missing_terms
-    missing_df$query <- 0
-    missing_df$p_value <- NaN
-    resultsCMfilter <- rbind(resultsCMfilter, missing_df)
   }
-  
-  resultsCMfilter$ratio <- resultsCMfilter$intersection_size/resultsCMfilter$term_size
-  resultsCMfilter <- resultsCMfilter[c('term_id','term_name','p_value','ratio')]
-  p_values <- resultsCMfilter[c('term_id','p_value')]
-  rownames(p_values) <- p_values$term_id
-  p_values$term_id <- NULL
-  p_values <- as.data.frame(t(p_values))
-  p_values <- as.matrix(p_values %>% dplyr::select(all_of(CMterms)))
-  mat_p[cellType,] <- p_values[1,]
-  
-  
-  ratio <- resultsCMfilter[c('term_id','ratio')]
-  rownames(ratio) <- ratio$term_id
-  ratio$term_id <- NULL
-  ratio <- as.data.frame(t(ratio))
-  ratio <- as.matrix(ratio %>% dplyr::select(all_of(CMterms)))
-  mat_ratio[cellType,] <- ratio[1,]
 }
 
+enrichment_all <- do.call(rbind, enrichment_list)
 
-df_ratio <- as.data.frame(t(mat_ratio))
-rownames(df_ratio) <- CMterms_names
-df_p <- as.data.frame(t(mat_p))
-rownames(df_p) <- CMterms_names
+all_terms <- unique(enrichment_all$term_name)
+complete_grid <- expand.grid(CellType = cell_types, term_name = all_terms, stringsAsFactors = FALSE)
+enrichment_all <- merge(complete_grid, enrichment_all, by = c("CellType", "term_name"), all.x = TRUE)
 
-df_ratio$GO_term <- rownames(df_ratio)
-df_p$GO_term <- rownames(df_p)
+enrichment_all$enrichment_ratio <- as.numeric(enrichment_all$intersection_size) / as.numeric(enrichment_all$term_size)
+enrichment_all$log_pval <- -log10(as.numeric(enrichment_all$p_value))
 
-df_ratio_long <- melt(df_ratio, id.vars = "GO_term", variable.name = "Cell_type", value.name = "Ratio")
-df_p_long <- melt(df_p, id.vars = "GO_term", variable.name = "Cell_type", value.name = "P_value")
-
-df_combined <- merge(df_ratio_long, df_p_long, by = c("Cell_type", "GO_term"))
-
-# Create the bubble plot
-p <- ggplot(df_combined, aes(x = Cell_type, y = GO_term, size = Ratio, color = -log10(P_value))) +
-  geom_point() +
-  scale_color_viridis_c() + 
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  labs(title = "Enriched GO terms in Cardiomyocytes",
-       x = "Cell Type",
-       y = "GO Term",
-       size = "Ratio",
-       color = "-log10(P-value)")+
-  theme(
-    panel.background = element_blank(),      
-    panel.grid.major = element_blank(),      
-    panel.grid.minor = element_blank(), 
-    axis.text.x = element_text(angle = 45, hjust = 1)
-  )
-ggsave("GO_CM_2_2.svg", plot = p, device = "svg", width = 10, height = 10)
-  
-  
+enrichment_all$CellType <- factor(enrichment_all$CellType, levels = cell_types)
+enrichment_all$term_name <- factor(enrichment_all$term_name, levels = all_terms)
 
 
-comp <- 'Endothelial'
-rest <- unique(so@meta.data$Annotations)
-rest <-  rest[rest != comp]
-ENterms <- c('GO:0009653','GO:0072359','GO:0048731','GO:0030029','GO:0030016','GO:0043292','GO:0030017','GO:0007507','GO:0060047','GO:0061061','GO:0003012','GO:0003205','GO:0014706','GO:0048738')
-ENterms_names <- c('Anatomical structure morphogenesis (GO:0009653)',
-                   'Circulatory system development (GO:0072359)',
-                   'System development (GO:0048731)',
-                   'Actin filament-based process (GO:0030029)',
-                   'Myofibril (GO:0030016)',
-                   'Contractile fiber (GO:0043292)',
-                   'Sarcomere (GO:0030017)',
-                   'Heart development (GO:0007507)',
-                   'Heart contraction (GO:0060047)',
-                   'Muscle structure development (GO:0061061)',
-                   'Muscle system process (GO:0003012)',
-                   'Cardiac chamber development (GO:0003205)',
-                   'Striated muscle tissue development (GO:0014706)',
-                   'Cardiac muscle tissue development (GO:0048738)')
+term_order <- c("myofibril", "contractile muscle fiber",'Striated muscle contraction pathway','sarcomere organization',
+                       'striated muscle tissue development','cardiac muscle tissue development','heart development',"myosin complex",
+                       'sarcomere','heart contraction','circulatory system development','endothelial cell differentiation','endothelial cell migration',
+                       'sprouting angiogenesis','tube development','vasculature development','angiogenesis','blood vessel development'
+                       )
+enrichment_all$term_name <- factor(enrichment_all$term_name, levels = term_order)
 
-ENterms <- c('GO:0072359','GO:0001944','GO:0001568','GO:0001525','GO:0007507')
-ENterms_names <- c('Circulatory system development (GO:0072359)',
-                   'Vasculature development (GO:0001944)',
-                   'Blood vessel development (GO:0001568)',
-                   'Angiogenesis (GO:0001525)',
-                   'Heart development (GO:0007507)')
-allGenes <- rownames(so)
-
-mat_p <- matrix(nrow = length(rest), ncol = length(ENterms))
-colnames(mat_p) <- ENterms
-rownames(mat_p) <- rest
-mat_ratio <- mat_p
-
-for (cellType in rest){
-  print(cellType)
-  ENMarkers <- FindMarkers(so,ident.1 = comp,ident.2 = cellType, logfc.threshold=0.5)
-  sigEN <- rownames(ENMarkers)[ENMarkers$p_val_adj<0.05]
-  resultsEN <- gost(query = sigEN, 
-                    organism = "hsapiens", 
-                    significant = TRUE, 
-                    user_threshold = 0.05, 
-                    correction_method = "fdr",
-                    custom_bg = allGenes)$result
-  
-  resultsENfilter <- resultsEN[resultsEN$term_id %in% ENterms,]
-  missing_terms <- setdiff(ENterms, resultsEN$term_id)
-  missing_df <- data.frame(term_id = missing_terms)
-  
-  if (length(missing_terms) > 0){
-    for(col in colnames(resultsEN)[-1]) {
-      missing_df[[col]] <- 0
-    }
-    missing_df$term_id <- missing_terms
-    missing_df$query <- 0
-    missing_df$p_value <- NaN
-    resultsENfilter <- rbind(resultsENfilter, missing_df)
-  }
-  resultsENfilter$ratio <- resultsENfilter$intersection_size/resultsENfilter$term_size
-  resultsENfilter <- resultsENfilter[c('term_id','term_name','p_value','ratio')]
-  p_values <- resultsENfilter[c('term_id','p_value')]
-  rownames(p_values) <- p_values$term_id
-  p_values$term_id <- NULL
-  p_values <- as.data.frame(t(p_values))
-  p_values <- as.matrix(p_values %>% dplyr::select(all_of(ENterms)))
-  mat_p[cellType,] <- p_values[1,]
-  
-  
-  ratio <- resultsENfilter[c('term_id','ratio')]
-  rownames(ratio) <- ratio$term_id
-  ratio$term_id <- NULL
-  ratio <- as.data.frame(t(ratio))
-  ratio <- as.matrix(ratio %>% dplyr::select(all_of(ENterms)))
-  mat_ratio[cellType,] <- ratio[1,]
-}
-
-
-df_ratio <- as.data.frame(t(mat_ratio))
-rownames(df_ratio) <- ENterms_names
-df_p <- as.data.frame(t(mat_p))
-rownames(df_p) <- ENterms_names
-
-df_ratio$GO_term <- rownames(df_ratio)
-df_p$GO_term <- rownames(df_p)
-
-df_ratio_long <- melt(df_ratio, id.vars = "GO_term", variable.name = "Cell_type", value.name = "Ratio")
-df_p_long <- melt(df_p, id.vars = "GO_term", variable.name = "Cell_type", value.name = "P_value")
-
-df_combined <- merge(df_ratio_long, df_p_long, by = c("Cell_type", "GO_term"))
-
-
-p <- ggplot(df_combined, aes(x = Cell_type, y = GO_term, size = Ratio, color = -log10(P_value))) +
-  geom_point() +
-  scale_color_viridis_c() + 
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  labs(title = "Enriched GO terms in Endothelial",
-       x = "Cell Type",
-       y = "GO Term",
-       size = "Ratio",
-       color = "-log10(P-value)") +
-  theme(
-    panel.background = element_blank(),      
-    panel.grid.major = element_blank(),      
-    panel.grid.minor = element_blank(), 
-    axis.text.x = element_text(angle = 45, hjust = 1)
-  )
-ggsave("GO_End_2_2.svg", plot = p, device = "svg", width = 10, height = 10)
+p <- ggplot(enrichment_all, aes(x = CellType, y = term_name, size = enrichment_ratio, color = log_pval)) +
+  geom_point(alpha = 0.8) +
+  scale_color_distiller(palette = "YlGnBu", direction = 1, name = "-log10(p-value)", na.value = "grey90") +
+  scale_size(range = c(3, 10), name = "Enrichment ratio") +
+  labs(x = "Cell Type", y = "GO Term", title = "GO Enrichment Comparison") +
+  theme_minimal(base_size = 13) +
+  theme(axis.text.y = element_text(size = 10),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor = element_blank())
+ggsave("Plots/LGW_Revisions_GOterms.svg", plot = p, device = "svg", width = 10, height = 7)
