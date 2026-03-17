@@ -1,169 +1,181 @@
+options(future.globals.maxSize = 8000 * 1024^2)
 library(dplyr)
+library(ggplot2)
 library(Seurat)
-library(ShinyCell)
 library(ClustAssess)
-####
-so <- readRDS('3D-Timecourse-so.rds')
-so <- CellCycleScoring(so, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
-ca <- readRDS('3D-Timecourse-ca.rds')
-clusters_21 <- ca$Most_Abundant$`1750`$clustering_stability$split_by_k$SLM$`21`$partitions[[1]]$mb
-ecc_21 <- ca$Most_Abundant$`1750`$clustering_stability$split_by_k$SLM$`21`$ecc
+library(harmony)
+library(ShinyCell)
 
-clusters_26 <- ca$Most_Abundant$`1750`$clustering_stability$split_by_k$SLM$`26`$partitions[[1]]$mb
-ecc_26 <- ca$Most_Abundant$`1750`$clustering_stability$split_by_k$SLM$`26`$ecc
+ncores <- 14
+my_cluster <- parallel::makeCluster(ncores, type = "PSOCK")
+doParallel::registerDoParallel(cl = my_cluster)
 
-embedding <- data.frame(ca$Most_Abundant$`1750`$umap)
-so@reductions[["umap"]] <- CreateDimReducObject(embeddings = as.matrix(embedding), key = "UMAP_", assay = DefaultAssay(so))
-
-embedding$ecc_21 <- ecc_21
-embedding$clusters_21_SLM <- as.factor(clusters_21)
-embedding$ecc_26 <- ecc_26
-embedding$clusters_26_SLM <- as.factor(clusters_26)
-
-embedding <- embedding[c('ecc_21','clusters_21_SLM','ecc_26','clusters_26_SLM')]
-so@meta.data <- cbind(so@meta.data,embedding)
-
-so@meta.data$Annotations[so@meta.data$clusters_21_SLM==1] <- 'late HB'
-so@meta.data$Annotations[so@meta.data$clusters_21_SLM==2] <- 'late HPB'
-so@meta.data$Annotations[so@meta.data$clusters_21_SLM==3] <- 'late HPB'
-so@meta.data$Annotations[so@meta.data$clusters_21_SLM==4] <- 'late HB'
-so@meta.data$Annotations[so@meta.data$clusters_21_SLM==5] <- 'HPB'
-so@meta.data$Annotations[so@meta.data$clusters_21_SLM==6] <- 'late HB'
-so@meta.data$Annotations[so@meta.data$clusters_21_SLM==7] <- 'late HPB'
-so@meta.data$Annotations[so@meta.data$clusters_21_SLM==8] <- 'HPB'
-so@meta.data$Annotations[so@meta.data$clusters_21_SLM==9] <- 'late HB'
-so@meta.data$Annotations[so@meta.data$clusters_21_SLM==10] <- 'late HB'
-so@meta.data$Annotations[so@meta.data$clusters_21_SLM==11] <- 'HPB'
-so@meta.data$Annotations[so@meta.data$clusters_21_SLM==12] <- 'GBC'
-so@meta.data$Annotations[so@meta.data$clusters_21_SLM==13] <- 'Early HB'
-so@meta.data$Annotations[so@meta.data$clusters_21_SLM==14] <- 'HPB'
-so@meta.data$Annotations[so@meta.data$clusters_21_SLM==15] <- 'Bridge pop. (diff. HPB-to-HB)'
-so@meta.data$Annotations[so@meta.data$clusters_21_SLM==16] <- 'late HB'
-so@meta.data$Annotations[so@meta.data$clusters_21_SLM==17] <- 'HPB'
-so@meta.data$Annotations[so@meta.data$clusters_21_SLM==18] <- 'late HPB'
-so@meta.data$Annotations[so@meta.data$clusters_21_SLM==19] <- 'HPB'
-so@meta.data$Annotations[so@meta.data$clusters_21_SLM==20] <- 'late HB'
-so@meta.data$Annotations[so@meta.data$clusters_21_SLM==21] <- '21 - query Cells'
-
-#Now Run CA again
-
-project_name <- '3D-Timecourse'
-Idents(so) <- so@meta.data$clusters_21_SLM
-#Remove 21
-so <- subset(so,idents=c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20))
-so <- SCTransform(so, return.only.var.genes=FALSE, verbose=FALSE)
-saveRDS(so,'3D-so-FinalNoClustering.rds')
-
-clustassess_autom <-readRDS('3D-ca-FinalNoClustering.rds')
-#18 clusters
-so <- CellCycleScoring(so, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
-clusters_18 <- clustassess_autom$Most_Abundant$`1750`$clustering_stability$split_by_k$SLM$`18`$partitions[[1]]$mb
-ecc_18 <- clustassess_autom$Most_Abundant$`1750`$clustering_stability$split_by_k$SLM$`18`$ecc
-
-embedding <- data.frame(clustassess_autom$Most_Abundant$`1750`$umap)
-so@reductions[["umap"]] <- CreateDimReducObject(embeddings = as.matrix(embedding), key = "UMAP_", assay = DefaultAssay(so))
-
-embedding$ecc_18 <- ecc_18
-embedding$clusters_18_SLM <- as.factor(clusters_18)
-
-embedding <- embedding[c('ecc_18','clusters_18_SLM')]
-so@meta.data <- cbind(so@meta.data,embedding)
-
-scConf = ShinyCell::createConfig(so)
-ShinyCell::makeShinyApp(so, scConf, gene.mapping = TRUE, gex.assay = "SCT",
-                        shiny.dir = "3D-Timecourse",
-                        shiny.title='3D-Timecourse')
+soMerged <- readRDS("path/to/soMerged.rds")
+pc_genes <- readLines("path/to/pc_genes.txt")
 
 
-#Now I need to do the opposite, from the 3D, annotate LBO,P0,P2
-so <- readRDS('3D-so-FinalNoClustering.rds')
-anno <- so@meta.data[c('Annotations')]
-so <-  readRDS('LBO-so.rds')
-meta <- so@meta.data
-meta <- merge(meta,anno,by='row.names', all.x = TRUE)
-rownames(meta) <- meta$Row.names
-meta$Row.names <- NULL
-so@meta.data <- meta
+counts <- GetAssayData(soMerged, assay = "RNA")
+counts <- counts[which(rownames(counts) %in% pc_genes), ]
+soMerged <- subset(soMerged, features = rownames(counts))
+soMerged <- SCTransform(soMerged, return.only.var.genes = FALSE, verbose = TRUE)
 
-ca <- readRDS('LBO-ca.rds')
-clusters_7 <- ca$Most_Abundant$`1750`$clustering_stability$split_by_k$SLM$`7`$partitions[[1]]$mb
-ecc_7 <- ca$Most_Abundant$`1750`$clustering_stability$split_by_k$SLM$`7`$ecc
+assay_name <- "SCT"
+var_features <- soMerged@assays[[assay_name]]@var.features
+n_abundant <- 3000
+most_abundant_genes <- rownames(soMerged@assays[[assay_name]])[
+  order(Matrix::rowSums(soMerged@assays[[assay_name]]), decreasing = TRUE)
+][1:n_abundant]
 
-clusters_11 <- ca$Most_Abundant$`1750`$clustering_stability$split_by_k$SLM$`11`$partitions[[1]]$mb
-ecc_11 <- ca$Most_Abundant$`1750`$clustering_stability$split_by_k$SLM$`11`$ecc
 
-embedding <- data.frame(ca$Most_Abundant$`1750`$umap)
-so@reductions[["umap"]] <- CreateDimReducObject(embeddings = as.matrix(embedding), key = "UMAP_", assay = DefaultAssay(so))
+choose_processing_function <- function(proc_type = "default", dt_mtx, npcs = 30, categ = NULL) {
+  if (proc_type == "default") {
+    return(function(dt_mtx, actual_npcs = 30) {
+      actual_npcs <- min(actual_npcs, ncol(dt_mtx) %/% 2)
+      RhpcBLASctl::blas_set_num_threads(foreach::getDoParWorkers())
+      embedding <- stats::prcomp(x = dt_mtx, rank. = actual_npcs)$x
+      RhpcBLASctl::blas_set_num_threads(1)
+      rownames(embedding) <- rownames(dt_mtx)
+      colnames(embedding) <- paste0("PC_", seq_len(ncol(embedding)))
+      return(embedding)
+    })
+  }
+  
+  if (proc_type == "harmony") {
+    return(function(dt_mtx, actual_npcs = 30) {
+      actual_npcs <- min(actual_npcs, ncol(dt_mtx) %/% 2)
+      RhpcBLASctl::blas_set_num_threads(foreach::getDoParWorkers())
+      embedding <- stats::prcomp(x = dt_mtx, rank. = actual_npcs)$x
+      RhpcBLASctl::blas_set_num_threads(1)
+      rownames(embedding) <- rownames(dt_mtx)
+      colnames(embedding) <- paste0("PC_", seq_len(actual_npcs))
+      embedding <- harmony::RunHarmony(embedding, categ, verbose = FALSE)
+      return(embedding)
+    })
+  }
+  
+  if (proc_type == "cca") {
+    return(function(dt_mtx, actual_npcs = 30) {
+      actual_npcs <- min(actual_npcs, ncol(dt_mtx) %/% 2)
+      dt_mtx <- t(dt_mtx)
+      sample_names <- unique(categ)
+      
+      so_objects <- lapply(sample_names, function(sample_name) {
+        ClustAssess::create_seurat_object_default(normalized_expression_matrix = dt_mtx[, categ == sample_name])
+      })
+      names(so_objects) <- sample_names
+      
+      unified_so <- merge(x = so_objects[[1]], y = so_objects[-1], add.cell.ids = sample_names)
+      unified_so <- NormalizeData(unified_so, verbose = FALSE)
+      unified_so <- FindVariableFeatures(unified_so, selection.method = "vst", nfeatures = nrow(dt_mtx), verbose = FALSE)
+      unified_so <- ScaleData(unified_so, features = rownames(dt_mtx), verbose = FALSE)
+      unified_so@assays$RNA@layers$scale.data <- dt_mtx
+      
+      RhpcBLASctl::blas_set_num_threads(foreach::getDoParWorkers())
+      unified_so <- RunPCA(unified_so, features = rownames(dt_mtx), npcs = actual_npcs, verbose = FALSE, approx = FALSE)
+      unified_so <- IntegrateLayers(
+        object = unified_so, method = CCAIntegration, orig.reduction = "pca",
+        new.reduction = "cca", scale.layer = "scale.data", features = rownames(dt_mtx), verbose = FALSE
+      )
+      RhpcBLASctl::blas_set_num_threads(1)
+      return(unified_so@reductions$cca@cell.embeddings)
+    })
+  }
+}
 
-embedding$ecc_7 <- ecc_7
-embedding$clusters_7_SLM <- as.factor(clusters_7)
-embedding$ecc_11 <- ecc_11
-embedding$clusters_11_SLM <- as.factor(clusters_11)
+gene_list <- list(
+  "Highly_Variable" = var_features,
+  "Most_Abundant" = most_abundant_genes
+)
 
-embedding <- embedding[c('ecc_7','clusters_7_SLM','ecc_11','clusters_11_SLM')]
-embedding <- embedding[rownames(embedding) %in% rownames(so@meta.data), ]
-so@meta.data <- cbind(so@meta.data,embedding)
-saveRDS(so,'LBO-so-annotated.rds')
-scConf = ShinyCell::createConfig(so)
-ShinyCell::makeShinyApp(so, scConf, gene.mapping = TRUE, gex.assay = "SCT",
-                        shiny.dir = "LBO-Annotated",
-                        shiny.title='LBO')
-#P0
-so <-  readRDS('P0-so.rds')
-meta <- so@meta.data
-meta <- merge(meta,anno,by='row.names', all.x = TRUE)
-rownames(meta) <- meta$Row.names
-meta$Row.names <- NULL
-so@meta.data <- meta
+steps_list <- list(
+  "Highly_Variable" = c(1500, 1750),
+  "Most_Abundant" = c(1500, 1750)
+)
 
-ca <- readRDS('P0-ca.rds')
-clusters_5 <- ca$Most_Abundant$`1750`$clustering_stability$split_by_k$SLM$`5`$partitions[[1]]$mb
-ecc_5 <- ca$Most_Abundant$`1750`$clustering_stability$split_by_k$SLM$`5`$ecc
+expr_matrix <- soMerged@assays$SCT@scale.data
+meta <- soMerged@meta.data
 
-clusters_10 <- ca$Most_Abundant$`1750`$clustering_stability$split_by_k$SLM$`10`$partitions[[1]]$mb
-ecc_10 <- ca$Most_Abundant$`1750`$clustering_stability$split_by_k$SLM$`10`$ecc
+RhpcBLASctl::blas_set_num_threads(1)
+print('BEGIN ClustAssess')
 
-embedding <- data.frame(ca$Most_Abundant$`1750`$umap)
-so@reductions[["umap"]] <- CreateDimReducObject(embeddings = as.matrix(embedding), key = "UMAP_", assay = DefaultAssay(so))
+clustassess_autom <- automatic_stability_assessment(
+  expression_matrix = expr_matrix,
+  n_repetitions = 30,
+  temp_file = "path/to/temp_clustassess.rds",
+  n_neigh_sequence = seq(from = 5, to = 50, by = 5),
+  resolution_sequence = seq(from = 0.1, to = 2, by = 0.1),
+  matrix_processing = choose_processing_function(proc_type = 'harmony', dt_mtx = expr_matrix, categ = meta$Dataset),
+  features_sets = gene_list,
+  steps = steps_list,
+  n_top_configs = 2,
+  save_temp = TRUE,
+  verbose = TRUE,
+  umap_arguments = list(min_dist = 0.3, n_neighbors = 30, metric = "cosine", init = "spectral")
+)
 
-embedding$ecc_5 <- ecc_5
-embedding$clusters_5_SLM <- as.factor(clusters_5)
-embedding$ecc_10 <- ecc_10
-embedding$clusters_10_SLM <- as.factor(clusters_10)
+saveRDS(clustassess_autom, "path/to/ClustAssess_Output.rds")
+parallel::stopCluster(cl = my_cluster)
 
-embedding <- embedding[c('ecc_5','clusters_5_SLM','ecc_10','clusters_10_SLM')]
-so@meta.data <- cbind(so@meta.data,embedding)
-saveRDS(so,'P0-so-annotated.rds')
-scConf = ShinyCell::createConfig(so)
-ShinyCell::makeShinyApp(so, scConf, gene.mapping = TRUE, gex.assay = "SCT",
-                        shiny.dir = "P0-Annotated",
-                        shiny.title='P0')
-#P2
-so <-  readRDS('P2-so.rds')
-meta <- so@meta.data
-meta <- merge(meta,anno,by='row.names', all.x = TRUE)
-rownames(meta) <- meta$Row.names
-meta$Row.names <- NULL
-so@meta.data <- meta
-ca <- readRDS('P2-ca.rds')
-clusters_4 <- ca$Most_Abundant$`1750`$clustering_stability$split_by_k$SLM$`4`$partitions[[1]]$mb
-ecc_4 <- ca$Most_Abundant$`1750`$clustering_stability$split_by_k$SLM$`4`$ecc
+ClustAssess::write_shiny_app(
+  object = soMerged,
+  assay_name = "SCT",
+  clustassess_object = clustassess_autom,
+  project_folder = "path/to/apps/HarmonyCA",
+  shiny_app_title = "Merged_Harmony_CA"
+)
 
-clusters_12 <- ca$Most_Abundant$`1750`$clustering_stability$split_by_k$SLM$`12`$partitions[[1]]$mb
-ecc_12 <- ca$Most_Abundant$`1750`$clustering_stability$split_by_k$SLM$`12`$ecc
 
-embedding <- data.frame(ca$Most_Abundant$`1750`$umap)
-so@reductions[["umap"]] <- CreateDimReducObject(embeddings = as.matrix(embedding), key = "UMAP_", assay = DefaultAssay(so))
+ca <- readRDS("path/to/ClustAssess_Output.rds")
 
-embedding$ecc_4 <- ecc_4
-embedding$clusters_4_SLM <- as.factor(clusters_4)
-embedding$ecc_12 <- ecc_12
-embedding$clusters_12_SLM <- as.factor(clusters_12)
 
-embedding <- embedding[c('ecc_4','clusters_4_SLM','ecc_12','clusters_12_SLM')]
-so@meta.data <- cbind(so@meta.data,embedding)
-saveRDS(so,'P2-so-annotated.rds')
-scConf = ShinyCell::createConfig(so)
-ShinyCell::makeShinyApp(so, scConf, gene.mapping = TRUE, gex.assay = "SCT",
-                        shiny.dir = "P2-Annotated",
-                        shiny.title='P2')
+embedding <- data.frame(ca$Highly_Variable$`1750`$umap)
+soMerged@reductions[["umap"]] <- CreateDimReducObject(embeddings = as.matrix(embedding), key = "UMAP_", assay = DefaultAssay(soMerged))
+
+k_values <- c("15", "24", "28", "41")
+for (k in k_values) {
+  clusters <- ca$Highly_Variable$`1750`$clustering_stability$split_by_k$SLM[[k]]$partitions[[1]]$mb
+  ecc <- ca$Highly_Variable$`1750`$clustering_stability$split_by_k$SLM[[k]]$ecc
+  
+  soMerged@meta.data[[paste0("clusters_", k, "_SLM")]] <- as.factor(clusters)
+  soMerged@meta.data[[paste0("ecc_", k)]] <- ecc
+}
+
+
+meta <- soMerged@meta.data
+meta$Annotation_Revisions <- 'None'
+
+meta$Annotation_Revisions[meta$clusters_24_SLM %in% c(3,22,12,16)] <- 'Posterior foregut'
+meta$Annotation_Revisions[meta$clusters_24_SLM %in% c(6)] <- 'Proliferative posterior foregut'
+meta$Annotation_Revisions[meta$clusters_24_SLM %in% c(9)] <- 'Proliferative mix'
+meta$Annotation_Revisions[meta$clusters_24_SLM %in% c(11)] <- 'PFG-HE'
+meta$Annotation_Revisions[meta$clusters_24_SLM %in% c(2)] <- 'hepatic endoderm + anterior foregut 2 - need to split'
+meta$Annotation_Revisions[meta$clusters_24_SLM %in% c(10)] <- 'Anterior foregut 2'
+meta$Annotation_Revisions[meta$clusters_24_SLM %in% c(19)] <- 'Anterior foregut 1'
+meta$Annotation_Revisions[meta$clusters_24_SLM %in% c(18)] <- 'Early airway foregut'
+meta$Annotation_Revisions[meta$clusters_24_SLM %in% c(7)] <- 'Anterior foregut 3'
+meta$Annotation_Revisions[meta$clusters_24_SLM %in% c(21)] <- 'Cardiomyocytes'
+meta$Annotation_Revisions[meta$clusters_24_SLM %in% c(14)] <- 'Endothelial'
+meta$Annotation_Revisions[meta$clusters_24_SLM %in% c(5)] <- 'Trachea/Airway progenitor (KRT7,CFTR) + hepatic endoderm'
+meta$Annotation_Revisions[meta$clusters_24_SLM %in% c(1,8,13,4)] <- 'Early HPB'
+meta$Annotation_Revisions[meta$clusters_24_SLM %in% c(15)] <- 'Early HB'
+meta$Annotation_Revisions[meta$clusters_24_SLM %in% c(20,24,17)] <- 'LPM/SHF'
+meta$Annotation_Revisions[meta$clusters_24_SLM %in% c(23)] <- 'Mystery cells'
+
+idx <- meta$Annotation_Revisions == 'hepatic endoderm + anterior foregut 2 - need to split'
+meta$Annotation_Revisions[idx & meta$clusters_28_SLM %in% c(10,13,15)] <- 'Anterior foregut 2'
+meta$Annotation_Revisions[idx & meta$clusters_28_SLM %in% c(1,4,6,12,17)] <- 'Hepatic Endoderm'
+
+idx <- meta$Annotation_Revisions == 'Trachea/Airway progenitor (KRT7,CFTR) + hepatic endoderm'
+meta$Annotation_Revisions[idx & meta$clusters_41_SLM %in% c(17)] <- 'Hepatic Endoderm'
+meta$Annotation_Revisions[idx & meta$clusters_41_SLM %in% c(19,35)] <- 'Airway foregut'
+meta$Annotation_Revisions[idx & meta$clusters_41_SLM %in% c(4,9,10,13,14,20,22,25,33,36)] <- 'Early HPB'
+
+soMerged@meta.data <- meta
+saveRDS(soMerged, "path/to/soMerged_Annotated.rds")
+
+scConf <- ShinyCell::createConfig(soMerged)
+ShinyCell::makeShinyApp(
+  soMerged, scConf, gene.mapping = TRUE, gex.assay = "SCT",
+  shiny.dir = "path/to/apps/ShinyCell_Annotated",
+  shiny.title = 'Merged_Annotated_ShinyCell'
+)
